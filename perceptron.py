@@ -1,9 +1,9 @@
 import numpy as np
 
-# Função de ativação (degrau bipolar: -1 ou +1)
+#Função de ativação (degrau bipolar: -1 ou +1)
 def step_function(x):
     return 1 if x >= 0 else -1
-# Ler dataset Spambase a partir do arquivo local
+#ler dataset
 data_path = 'spambase/spambase.data'
 parsed = []
 with open(data_path, 'r', encoding='utf-8') as f:
@@ -12,12 +12,12 @@ with open(data_path, 'r', encoding='utf-8') as f:
         if not line:
             continue
         parts = line.split(',')
-        # aceitar linhas com pelo menos 58 campos e truncar caso tenha mais
+        #aceitar linhas com pelo menos 58 campos e truncar caso tenha mais
         if len(parts) >= 58:
             vals = list(map(float, parts[:58]))
             parsed.append(vals)
         else:
-            # ignorar linhas mal formatadas
+            #ignorar linhas mal formatadas
             continue
 
 if len(parsed) == 0:
@@ -27,39 +27,50 @@ data_arr = np.array(parsed, dtype=float)
 X_all = data_arr[:, :-1]
 y_all = data_arr[:, -1].astype(int)
 
-# Mapear labels 0 -> -1, 1 -> +1
+#mapear labels 0 -> -1, 1 -> +1
 y_all = np.where(y_all == 0, -1, 1)
 
-# Usar os primeiros 40 exemplos para treino e os 30 seguintes para teste
-X = X_all[:40]
-y = y_all[:40]
+#embaralhar os dados para misturar as classes
+np.random.seed(42) 
+indices = np.random.permutation(len(X_all))
+X_all = X_all[indices]
+y_all = y_all[indices]
 
-X_teste = X_all[40:40+30]
-Y_teste = y_all[40:40+30]
+#normalizar os dados (StandardScaler manual)
+mean_X = np.mean(X_all, axis=0)
+std_X = np.std(X_all, axis=0)
+#evitar divisão por zero
+std_X = np.where(std_X == 0, 1, std_X)
+X_all = (X_all - mean_X) / std_X
 
-# Hiperparâmetros (mantidos próximos do original)
-lr = 0.4
-n_epochs = 10
+X = X_all[:200]  #200 exemplos para treino
+y = y_all[:200]
 
-# Inicializar pesos e bias com valores não-zero determinísticos
-# (mantemos valores pequenos e variados para não usar zeros)
-init_template = [0.4, -0.6, 0.6, -0.2, 0.1]
-repeats = (X.shape[1] + len(init_template) - 1) // len(init_template)
-pesos = np.array((init_template * repeats)[: X.shape[1]], dtype=float)
-bias = 0.5
+X_teste = X_all[200:300]  #100 exemplos para teste
+Y_teste = y_all[200:300]
 
-print("Treino: 25 exemplos, Teste: 15 exemplos")
-print("Pesos iniciais:", pesos, "Bias inicial:", bias)
+# Hiperparâmetros otimizados
+lr = 0.1  #taxa de aprendizagem
+n_epochs = 20  #épocas
 
-# Treinamento (regra do Perceptron; preserva prints do fluxo original)
+#inicialização pesos com valores aleatórios pequenos 
+np.random.seed(42)
+#inicialização normal com desvio padrão um pouco maior
+pesos = np.random.normal(0, 0.1, X.shape[1])
+bias = 0.5  #Bias inicial maior
+
+print(f"Treino: {len(X)} exemplos, Teste: {len(X_teste)} exemplos")
+print("Distribuição de classes no treino:", np.bincount(y + 1))
+print("Distribuição de classes no teste:", np.bincount(Y_teste + 1))
+print("Pesos iniciais (Normal std=0.1):", pesos[:5], "... Bias inicial:", bias)
+
+#treinamento 
 for epoca in range(n_epochs):
     print(f"\nÉpoca {epoca+1}")
     for x_i, y_i in zip(X, y):
         soma = np.dot(pesos, x_i) + bias
         y_pred = step_function(soma)
         erro = y_i - y_pred
-
-        # Atualização dos pesos e bias
         pesos += lr * erro * x_i
         bias += lr * erro
 
@@ -67,7 +78,7 @@ for epoca in range(n_epochs):
             f"Entrada: {x_i[:5]}... (mostrando 5 primeiros atributos), "
             f"Esperado: {y_i}, Previsto: {y_pred}, Erro: {erro}"
         )
-        # Mostrar valor de cada peso atualizado (vetor completo)
+        #valor de cada peso atualizado (vetor completo)
         print(
             "Pesos atualizados:",
             np.array2string(pesos, precision=6, floatmode='fixed')
@@ -77,11 +88,10 @@ for epoca in range(n_epochs):
 
 print("\nPesos finais:", pesos, "Bias final:", bias)
 
-# Avaliar em conjunto de teste
 print("\n--- Predições (conjunto de teste) ---")
 acertou = 0
 exemplo_teste = 0
-# usar zip exatamente como na estrutura da professora
+
 for x_i, y_i in zip(X_teste, Y_teste):
     soma = np.dot(pesos, x_i) + bias
     y_pred = step_function(soma)
